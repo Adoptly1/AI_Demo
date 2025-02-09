@@ -278,6 +278,7 @@ class EnhancedAdoptlyDemoCreator:
             You are an expert scriptwriter for product demo videos. Create a compelling script based on:
             Summary: {summary}
             Detailed Content: {full_content}
+            Avoid using generic phrases like 'screen 0.1', 'slide 0.2', and ensure the script sounds natural and engaging, as if a human is speaking.
             """
 
             response = openai.ChatCompletion.create(
@@ -291,6 +292,11 @@ class EnhancedAdoptlyDemoCreator:
             )
 
             main_script = response.choices[0].message.content
+
+            # Post-process the script to remove unwanted phrases
+            main_script = re.sub(r'\bscreen \d+\.\d+\b', '', main_script, flags=re.IGNORECASE)
+            main_script = re.sub(r'\bslide \d+\.\d+\b', '', main_script, flags=re.IGNORECASE)
+
             return f"{adoptly_intro}\n\n{main_script}"
 
         except Exception as e:
@@ -498,5 +504,3 @@ class EnhancedAdoptlyDemoCreator:
 if __name__ == "__main__":
     app = EnhancedAdoptlyDemoCreator()
     app.main()
-
-
