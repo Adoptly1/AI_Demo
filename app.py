@@ -2,22 +2,24 @@ import streamlit as st
 import os
 from PIL import Image
 import pypdfium2 as pdfium
-import pandas as pd  # Not strictly needed, but good practice to keep
-from pathlib import Path  # Not strictly needed, but good practice to keep
-import time  # Used for demonstration purposes, can be removed if no actual delays
+# pandas and pathlib aren't directly used, but are good practice for file handling
+# so I'm leaving them.  Remove if you're *sure* you don't need them.
+import pandas as pd
+from pathlib import Path
+import time
 from moviepy.editor import *
 import openai
 from gtts import gTTS
 import tempfile
-import base64  # Not used directly, but potentially useful for image handling
+import base64  # Not used directly, but can be useful for image embedding.  Keep.
 import pytesseract
 import cv2
 import numpy as np
-from dotenv import load_dotenv # Not used, but good practice if you *were* loading from .env
+from dotenv import load_dotenv
 import io
 import re
 from scipy.io.wavfile import write
-import pytesseract  # Import repeated, remove the redundant one
+
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # API Key configuration
@@ -81,7 +83,7 @@ class EnhancedAdoptlyDemoCreator:
                 page = pdf.get_page(page_number)
                 textpage = page.get_textpage()
                 text = textpage.get_text_range()
-                
+
                 # Clean and format the text
                 text = re.sub(r'\s+', ' ', text)  # Remove extra whitespace
                 text = text.replace('\n\n', '\n').strip()
@@ -104,10 +106,10 @@ class EnhancedAdoptlyDemoCreator:
             for page_number in range(pages_to_process):
                 page = pdf.get_page(page_number)
                 pil_image = page.render().to_pil()
-                
+
                 # Enhance image quality
                 enhanced_image = self.enhance_image(pil_image)
-                
+
                 image_path = os.path.join(self.temp_dir, f"image_{page_number}.png")
                 enhanced_image.save(image_path, quality=95)
                 image_paths.append(image_path)
@@ -122,11 +124,11 @@ class EnhancedAdoptlyDemoCreator:
         try:
             # Convert PIL Image to OpenCV format
             cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            
+
             # Apply enhancements
             enhanced = cv2.detailEnhance(cv_image, sigma_s=10, sigma_r=0.15)
             enhanced = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)
-            
+
             return Image.fromarray(enhanced)
         except Exception as e:
             st.warning(f"Image enhancement failed: {str(e)}")
@@ -145,7 +147,7 @@ class EnhancedAdoptlyDemoCreator:
             duration = video_clip.duration
             fps = video_clip.fps
             num_frames = int(duration * fps)
-            
+
             image_paths = []
             # Extract a limited number of frames (e.g., 5)
             max_frames = 5
@@ -170,75 +172,69 @@ class EnhancedAdoptlyDemoCreator:
             return None
 
 
-    def enhance_script_generation(self, content, video_content=None):
-        """Generate enhanced script with natural narration and improved timing, including intro."""
-        try:
-            # Intro for the demo creator itself.  This is consistent.
-            intro = "Welcome to Adoptly Demo Creator!  I'll be taking your provided content and turning it into a short, engaging product demonstration.  I'll analyze your PDF or video, identify key features, and create a natural-sounding narration. Let's see what I can create for you!"
 
-            # Extract key points from content
+    def enhance_script_generation(self, content, video_content=None):
+        """Generate script with a self-introduction and then the product demo."""
+        try:
+            # Consistent self-introduction.
+            intro = "Hello! I'm Adoptly Demo Creator, your AI-powered assistant for creating engaging product demos.  I've analyzed the content you provided, and I'm ready to present a compelling demonstration.  Let's get started!"
+
+            # Extract key points.
             key_points = self.extract_key_points(content)
 
             if video_content:
-                # Calculate optimal pacing based on video duration
                 duration = video_content['timing_info']['duration']
                 segments = self.plan_video_segments(duration, key_points)
-
                 video_prompt = f"""
                 {intro}
 
-                Now, let's create a natural, engaging narration for the product demo video based on the following information.
+                Now, let's craft a narration for the demo video:
 
                 Duration: {duration:.2f} seconds
-                Key Points to Cover:
+                Key Points:
                 {key_points}
 
                 Segment Timing:
                 {segments}
 
                 Guidelines:
-                1. Start with the core value proposition
-                2. Use natural, conversational language
-                3. Avoid artificial introductions or robotic language
-                4. Include smooth transitions between topics
-                5. Match the pacing to segment timings
-                6. Focus on benefits and impact
+                1. Start with the core value proposition.
+                2. Use natural, conversational language.
+                3. Smooth transitions between topics.
+                4. Match pacing to segment timings.
+                5. Focus on benefits and impact.
 
-                Create a flowing narrative that sounds like an experienced presenter naturally explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
+                Create a flowing narrative. Use minimal timestamps, only marking major transitions with [MM:SS].
                 """
-            else:
-                # For PDF content
+            else:  # PDF content
                 words = len(content.split())
-                estimated_duration = (words / 150) * 60  # 150 words per minute
+                estimated_duration = (words / 150) * 60
                 segments = self.plan_video_segments(estimated_duration, key_points)
-
                 video_prompt = f"""
                 {intro}
 
-                Now, let's create a natural narration for a {estimated_duration:.0f}-second product demo based on this document.
+                Now, here's a narration for a {estimated_duration:.0f}-second product demo based on the document:
 
-                Key Points to Cover:
+                Key Points:
                 {key_points}
 
                 Segment Timing:
                 {segments}
 
                 Guidelines:
-                1. Focus on core benefits and value
-                2. Use natural, flowing language
-                3. Create clear transitions between topics
-                4. Match the pacing to segment timings
-                5. Sound conversational and engaging
+                1. Focus on core benefits and value.
+                2. Use natural, flowing language.
+                3. Clear transitions between topics.
+                4. Match pacing to segment timings.
+                5. Sound conversational and engaging.
 
-                The narration should flow naturally like an experienced presenter explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
+                Create a natural narration. Use minimal timestamps, only marking major transitions with [MM:SS].
                 """
 
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert product presenter creating natural, engaging demo narrations."},
+                    {"role": "system", "content": "You are an expert product presenter."},
                     {"role": "user", "content": video_prompt}
                 ],
                 temperature=0.7,
@@ -251,6 +247,7 @@ class EnhancedAdoptlyDemoCreator:
         except Exception as e:
             st.error(f"Error in script generation: {str(e)}")
             return None
+
 
     def extract_key_points(self, content):
         """Extract key points from content for better script structure."""
@@ -309,6 +306,7 @@ class EnhancedAdoptlyDemoCreator:
             st.warning(f"Error planning segments: {str(e)}")
             return f"Divide content evenly across {duration:.0f} seconds"
 
+
     def post_process_script(self, script):
         """Clean and format the generated script."""
         # Remove multiple consecutive newlines
@@ -323,25 +321,25 @@ class EnhancedAdoptlyDemoCreator:
         return script
 
     def create_enhanced_audio(self, script):
-        """Create enhanced audio with improved pacing and natural breaks."""
+        """Create enhanced audio, fixing repetition by splitting on sentences."""
         try:
-            # Split script into segments based on timestamps and natural breaks
+            # Split script into natural segments based on *sentences*, not just timestamps.
             segments = self.split_script_into_segments(script)
-            
+
             audio_files = []
             for segment in segments:
                 # Clean the segment text
                 clean_text = self.clean_text_for_tts(segment)
-                
+
                 if clean_text:
-                    # Create audio with natural pacing
+                    # Create audio
                     tts = gTTS(text=clean_text, lang='en', slow=False)
                     audio_path = os.path.join(self.temp_dir, f'audio_{len(audio_files)}.mp3')
                     tts.save(audio_path)
-                    
+
                     # Add slight pause after each segment
                     self.add_pause_to_audio(audio_path)
-                    
+
                     audio_files.append(audio_path)
 
             return audio_files
@@ -349,33 +347,13 @@ class EnhancedAdoptlyDemoCreator:
             st.error(f"Error creating audio: {str(e)}")
             return None
 
+
     def split_script_into_segments(self, script):
-        """Split script into natural segments for better audio generation."""
-        # Split by timestamps
-        timestamp_segments = re.split(r'\[\d{2}:\d{2}\]', script)
-        
-        segments = []
-        for segment in timestamp_segments:
-            # Further split long segments by sentences
-            sentences = re.split(r'(?<=[.!?])\s+', segment.strip())
-            
-            current_segment = []
-            current_length = 0
-            
-            for sentence in sentences:
-                if current_length + len(sentence) > 300:  # Optimal length for TTS
-                    if current_segment:
-                        segments.append(' '.join(current_segment))
-                    current_segment = [sentence]
-                    current_length = len(sentence)
-                else:
-                    current_segment.append(sentence)
-                    current_length += len(sentence)
-            
-            if current_segment:
-                segments.append(' '.join(current_segment))
-        
-        return [s for s in segments if s.strip()]
+        """Split script into natural segments based on *sentences* for TTS."""
+        # Split by sentences.  This is the KEY to avoiding repetition.
+        sentences = re.split(r'(?<=[.!?])\s+', script.strip())
+        return [s for s in sentences if s.strip()]
+
 
     def clean_text_for_tts(self, text):
         """Clean and format text for optimal TTS output."""
@@ -406,9 +384,8 @@ class EnhancedAdoptlyDemoCreator:
         silence = np.zeros(int(duration * 44100))  # 44100 Hz sample rate
         write(pause_path, 44100, silence.astype(np.float32))
         return pause_path
-
     def create_video(self, image_paths, audio_files, background_path=None):
-        """Create video with improved timing, transitions, and aspect ratio handling."""
+        """Create video, aligning image durations with audio segments."""
         try:
             if not image_paths or not audio_files:
                 st.error("No images or audio files available")
@@ -506,6 +483,8 @@ class EnhancedAdoptlyDemoCreator:
             st.error(f"Error creating video: {str(e)}")
             return None
 
+
+
     def show_processing_animation(self, message):
         """Display processing animation with progress updates."""
         st.markdown(f"""
@@ -598,7 +577,7 @@ class EnhancedAdoptlyDemoCreator:
 
                             if video_path and os.path.exists(video_path):
                                 st.success("🎉 Your demo video is ready!")
-                                
+
                                 # Display video and download options
                                 col1, col2 = st.columns([2, 1])
                                 with col1:
@@ -611,7 +590,7 @@ class EnhancedAdoptlyDemoCreator:
                                             file_name="adoptly_demo.mp4",
                                             mime="video/mp4"
                                         )
-                                    
+
                                     if st.button("📝 View Script"):
                                         st.markdown("### Generated Script")
                                         st.markdown(script)
