@@ -36,101 +36,33 @@ class EnhancedAdoptlyDemoCreator:
         self.temp_dir = tempfile.mkdtemp()
 
     def setup_streamlit(self):
+        """Configure Streamlit page settings."""
         st.set_page_config(
-            page_title="Adoptly Demo Creator",
+            page_title="Enhanced Adoptly Demo Creator",
             page_icon="🎥",
             layout="wide"
         )
-        
         st.markdown("""
         <style>
-        .main {
-            background-color: #f0f2f6;
-        }
-        .stButton>button {
-            background-color: #FF4B4B;
-            color: white;
-            border-radius: 10px;
-            padding: 10px 25px;
-            transition: all 0.3s ease;
-        }
-        .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        .upload-box {
-            border: 2px dashed #FF4B4B;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        .upload-box:hover {
-            border-color: #ff7676;
-            background-color: rgba(255,75,75,0.05);
-        }
-        .success-message {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            border-left: 5px solid #28a745;
-        }
-        .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            border-left: 5px solid #dc3545;
-        }
-        .status-card {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin: 10px 0;
-            transition: all 0.3s ease;
-        }
         .processing-animation {
             text-align: center;
-            padding: 20px;
+            padding: 2rem;
         }
         .loader {
-            border: 5px solid #f3f3f3;
+            border: 4px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 5px solid #FF4B4B;
+            border-top: 4px solid #3498db;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 10px auto;
+            margin: 0 auto;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .header-container {
-            background: linear-gradient(90deg, #FF4B4B 0%, #FF8E53 100%);
-            padding: 2rem;
-            border-radius: 15px;
-            margin-bottom: 2rem;
-            color: white;
-            text-align: center;
-        }
         </style>
         """, unsafe_allow_html=True)
-
-    def handle_errors(func):
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                return None
-        return wrapper
-    
-    @handle_errors
 
     def setup_api_key(self):
         """Setup API key."""
@@ -175,22 +107,6 @@ class EnhancedAdoptlyDemoCreator:
         script = script.replace("Narrator (V.O.):", "").strip()  # Remove redundant narrator tags
         return script
 
-
-    def enhance_image(self, image):
-        """Enhance image quality for better video presentation."""
-        try:
-            # Convert PIL Image to OpenCV format
-            cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            
-            # Apply enhancements
-            enhanced = cv2.detailEnhance(cv_image, sigma_s=10, sigma_r=0.15)
-            enhanced = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)
-            
-            return Image.fromarray(enhanced)
-        except Exception as e:
-            st.warning(f"Image enhancement failed: {str(e)}")
-            return image
-
     def process_video_content(self, video_file):
         """Processes the uploaded video file to extract frames and duration."""
         try:
@@ -210,8 +126,8 @@ class EnhancedAdoptlyDemoCreator:
             max_frames = 5
             for i in range(min(max_frames, num_frames)):
                 frame_time = i * (duration / min(max_frames, num_frames))
-                frame = video_clip.to_ImageClip(frame_time).to_array()
-                frame_image = Image.fromarray(frame)
+                frame = video_clip.get_frame(frame_time)
+                frame_image = Image.fromarray(frame)  # Directly use the frame array for image creation
                 enhanced_frame = self.enhance_image(frame_image)
                 image_path = os.path.join(self.temp_dir, f"frame_{i}.png")
                 enhanced_frame.save(image_path)
@@ -227,6 +143,22 @@ class EnhancedAdoptlyDemoCreator:
         except Exception as e:
             st.error(f"Error processing video: {str(e)}")
             return None
+
+
+    def enhance_image(self, image):
+        """Enhance image quality for better video presentation."""
+        try:
+            # Convert PIL Image to OpenCV format
+            cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            
+            # Apply enhancements
+            enhanced = cv2.detailEnhance(cv_image, sigma_s=10, sigma_r=0.15)
+            enhanced = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)
+            
+            return Image.fromarray(enhanced)
+        except Exception as e:
+            st.warning(f"Image enhancement failed: {str(e)}")
+            return image
 
     def enhance_script_generation(self, content, video_content=None):
         """Generate enhanced script with natural narration and improved timing."""
@@ -287,7 +219,7 @@ class EnhancedAdoptlyDemoCreator:
                 """
 
             response = openai.ChatCompletion.create(
-                model="gpt-4o",
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert product presenter creating natural, engaging demo narrations."},
                     {"role": "user", "content": video_prompt}
@@ -318,7 +250,7 @@ class EnhancedAdoptlyDemoCreator:
             """
             
             response = openai.ChatCompletion.create(
-                model="gpt-4o",
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert at extracting key points from product documentation."},
                     {"role": "user", "content": prompt}
@@ -346,7 +278,7 @@ class EnhancedAdoptlyDemoCreator:
             """
             
             response = openai.ChatCompletion.create(
-                model="gpt-4o",
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert at planning video timing and pacing."},
                     {"role": "user", "content": prompt}
@@ -376,7 +308,7 @@ class EnhancedAdoptlyDemoCreator:
     def create_enhanced_audio(self, script):
         """Create enhanced audio with improved pacing and natural breaks."""
         try:
-            # Split script into segments based on timestamps and natural breaks
+            # Split script into segments based on *sentences*
             segments = self.split_script_into_segments(script)
             
             audio_files = []
@@ -401,32 +333,9 @@ class EnhancedAdoptlyDemoCreator:
             return None
 
     def split_script_into_segments(self, script):
-        """Split script into natural segments for better audio generation."""
-        # Split by timestamps
-        timestamp_segments = re.split(r'\[\d{2}:\d{2}\]', script)
-        
-        segments = []
-        for segment in timestamp_segments:
-            # Further split long segments by sentences
-            sentences = re.split(r'(?<=[.!?])\s+', segment.strip())
-            
-            current_segment = []
-            current_length = 0
-            
-            for sentence in sentences:
-                if current_length + len(sentence) > 300:  # Optimal length for TTS
-                    if current_segment:
-                        segments.append(' '.join(current_segment))
-                    current_segment = [sentence]
-                    current_length = len(sentence)
-                else:
-                    current_segment.append(sentence)
-                    current_length += len(sentence)
-            
-            if current_segment:
-                segments.append(' '.join(current_segment))
-        
-        return [s for s in segments if s.strip()]
+        """Split script into natural segments for better audio generation. Split by sentence."""
+        sentences = re.split(r'(?<=[.!?])\s+', script.strip())
+        return [s for s in sentences if s.strip()]
 
     def clean_text_for_tts(self, text):
         """Clean and format text for optimal TTS output."""
