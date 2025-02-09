@@ -2,22 +2,22 @@ import streamlit as st
 import os
 from PIL import Image
 import pypdfium2 as pdfium
-import pandas as pd
-from pathlib import Path
-import time
+import pandas as pd  # Not strictly needed, but good practice to keep
+from pathlib import Path  # Not strictly needed, but good practice to keep
+import time  # Used for demonstration purposes, can be removed if no actual delays
 from moviepy.editor import *
 import openai
 from gtts import gTTS
 import tempfile
-import base64
+import base64  # Not used directly, but potentially useful for image handling
 import pytesseract
 import cv2
 import numpy as np
-from dotenv import load_dotenv
+from dotenv import load_dotenv # Not used, but good practice if you *were* loading from .env
 import io
 import re
 from scipy.io.wavfile import write
-import pytesseract
+import pytesseract  # Import repeated, remove the redundant one
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # API Key configuration
@@ -132,27 +132,70 @@ class EnhancedAdoptlyDemoCreator:
             st.warning(f"Image enhancement failed: {str(e)}")
             return image
 
-    def enhance_script_generation(self, content, video_content=None):
-        """Generate enhanced script with natural narration and improved timing."""
+    def process_video_content(self, video_file):
+        """Processes the uploaded video file to extract frames and duration."""
         try:
+            # Save the video file temporarily
+            temp_video_path = os.path.join(self.temp_dir, video_file.name)
+            with open(temp_video_path, "wb") as f:
+                f.write(video_file.getbuffer())  # Use getbuffer() for BytesIO
+
+            # Extract frames and duration using moviepy
+            video_clip = VideoFileClip(temp_video_path)
+            duration = video_clip.duration
+            fps = video_clip.fps
+            num_frames = int(duration * fps)
+            
+            image_paths = []
+            # Extract a limited number of frames (e.g., 5)
+            max_frames = 5
+            for i in range(min(max_frames, num_frames)):
+                frame_time = i * (duration / min(max_frames, num_frames))
+                frame = video_clip.to_ImageClip(frame_time).to_array()
+                frame_image = Image.fromarray(frame)
+                enhanced_frame = self.enhance_image(frame_image)
+                image_path = os.path.join(self.temp_dir, f"frame_{i}.png")
+                enhanced_frame.save(image_path)
+                image_paths.append(image_path)
+
+            video_clip.close()  # Close the video clip after use
+
+            return {
+                'image_paths': image_paths,
+                'timing_info': {'duration': duration}
+            }
+
+        except Exception as e:
+            st.error(f"Error processing video: {str(e)}")
+            return None
+
+
+    def enhance_script_generation(self, content, video_content=None):
+        """Generate enhanced script with natural narration and improved timing, including intro."""
+        try:
+            # Intro for the demo creator itself.  This is consistent.
+            intro = "Welcome to Adoptly Demo Creator!  I'll be taking your provided content and turning it into a short, engaging product demonstration.  I'll analyze your PDF or video, identify key features, and create a natural-sounding narration. Let's see what I can create for you!"
+
             # Extract key points from content
             key_points = self.extract_key_points(content)
-            
+
             if video_content:
                 # Calculate optimal pacing based on video duration
                 duration = video_content['timing_info']['duration']
                 segments = self.plan_video_segments(duration, key_points)
-                
+
                 video_prompt = f"""
-                Create a natural, engaging narration for a product demo video.
-                
+                {intro}
+
+                Now, let's create a natural, engaging narration for the product demo video based on the following information.
+
                 Duration: {duration:.2f} seconds
                 Key Points to Cover:
                 {key_points}
-                
+
                 Segment Timing:
                 {segments}
-                
+
                 Guidelines:
                 1. Start with the core value proposition
                 2. Use natural, conversational language
@@ -160,7 +203,7 @@ class EnhancedAdoptlyDemoCreator:
                 4. Include smooth transitions between topics
                 5. Match the pacing to segment timings
                 6. Focus on benefits and impact
-                
+
                 Create a flowing narrative that sounds like an experienced presenter naturally explaining the product.
                 Use minimal timestamps, only marking major transitions with [MM:SS].
                 """
@@ -169,23 +212,25 @@ class EnhancedAdoptlyDemoCreator:
                 words = len(content.split())
                 estimated_duration = (words / 150) * 60  # 150 words per minute
                 segments = self.plan_video_segments(estimated_duration, key_points)
-                
+
                 video_prompt = f"""
-                Create a natural narration for a {estimated_duration:.0f}-second product demo.
-                
+                {intro}
+
+                Now, let's create a natural narration for a {estimated_duration:.0f}-second product demo based on this document.
+
                 Key Points to Cover:
                 {key_points}
-                
+
                 Segment Timing:
                 {segments}
-                
+
                 Guidelines:
                 1. Focus on core benefits and value
                 2. Use natural, flowing language
                 3. Create clear transitions between topics
                 4. Match the pacing to segment timings
                 5. Sound conversational and engaging
-                
+
                 The narration should flow naturally like an experienced presenter explaining the product.
                 Use minimal timestamps, only marking major transitions with [MM:SS].
                 """
@@ -363,7 +408,7 @@ class EnhancedAdoptlyDemoCreator:
         return pause_path
 
     def create_video(self, image_paths, audio_files, background_path=None):
-        """Create video with improved timing and transitions."""
+        """Create video with improved timing, transitions, and aspect ratio handling."""
         try:
             if not image_paths or not audio_files:
                 st.error("No images or audio files available")
@@ -373,48 +418,72 @@ class EnhancedAdoptlyDemoCreator:
             total_duration = 0
 
             # Calculate total audio duration
-            audio_durations = []
             for audio_file in audio_files:
                 audio_clip = AudioFileClip(audio_file)
-                audio_durations.append(audio_clip.duration)
                 total_duration += audio_clip.duration
-                audio_clip.close()
+                audio_clip.close()  # Close each clip after getting duration
 
-            # Calculate time per image
-            time_per_image = total_duration / len(image_paths)
-            
+            # Calculate time per image, *but don't use it directly for each clip's duration*
+            time_per_image = total_duration / len(image_paths) if len(image_paths) > 0 else 0  # Avoid division by zero
+
+            audio_clip_index = 0
+            current_audio_time = 0
+
             for i, image_path in enumerate(image_paths):
-                # Create image clip with transition effects
                 image_clip = ImageClip(image_path)
-                
-                # Calculate duration for this image
-                if i < len(image_paths) - 1:
-                    duration = time_per_image
-                else:
-                    # Last image gets remaining time
-                    duration = total_duration - (time_per_image * (len(image_paths) - 1))
-                
-                image_clip = image_clip.set_duration(duration)
-                
-                # Add fade in/out effects
+
+                # Determine the duration for *this* image clip based on the audio.
+                if audio_clip_index < len(audio_files):
+                    audio_clip = AudioFileClip(audio_files[audio_clip_index])
+                    image_duration = audio_clip.duration
+                    audio_clip.close() # Close after use
+                else:  # Fallback, should not normally happen if audio matches images
+                    image_duration = time_per_image
+
+                image_clip = image_clip.set_duration(image_duration)
+
+                # Resize images to maintain aspect ratio and fit within a standard frame (e.g., 1280x720)
+                target_width = 1280
+                target_height = 720
+                image_clip = image_clip.resize(lambda t: (target_width, target_height) if image_clip.w > target_width or image_clip.h > target_height else (image_clip.w, image_clip.h) ) # Resize to fit
+
+
+                 # Add fade in/out effects
                 image_clip = image_clip.fadein(0.5).fadeout(0.5)
-                
-                if background_path:
-                    background = ImageClip(background_path).set_duration(duration)
-                    image_clip = CompositeVideoClip([background, image_clip.set_pos("center")])
-                
+
+                # Center the image.  Important after resizing.
+                image_clip = image_clip.set_pos("center")
                 clips.append(image_clip)
+
+                current_audio_time += image_duration
+                if current_audio_time >= sum(AudioFileClip(af).duration for af in audio_files[:audio_clip_index+1]):
+                    audio_clip_index += 1
+
 
             # Combine video clips
             final_video = concatenate_videoclips(clips, method="compose")
-            
+
             # Combine audio files
             audio_clips = [AudioFileClip(af) for af in audio_files]
             final_audio = concatenate_audioclips(audio_clips)
-            
-            # Set audio to video
+
+
+            # Set audio to video, ensuring audio and video durations are aligned
             final_video = final_video.set_audio(final_audio)
-            
+            if final_video.duration > final_audio.duration:
+                final_video = final_video.subclip(0, final_audio.duration) # Trim video if needed
+            elif final_audio.duration > final_video.duration:
+                #This part of the code is for creating a silence and adding to end
+                #to adjust audio length
+                difference_duration = final_audio.duration - final_video.duration
+                pause_audio_path = self.create_pause(difference_duration)
+                pause_audio_clip = AudioFileClip(pause_audio_path)
+                list_for_concatinate = [final_audio,pause_audio_clip]
+                final_audio = concatenate_audioclips(list_for_concatinate)
+                final_video = final_video.set_audio(final_audio)
+                #final_audio = final_audio.subclip(0, final_video.duration) # Trim audio *shouldn't* happen, but is a safeguard
+
+
             # Write final video
             output_path = os.path.join(self.temp_dir, 'final_video.mp4')
             final_video.write_videofile(output_path, fps=24, codec='libx264',
@@ -424,10 +493,12 @@ class EnhancedAdoptlyDemoCreator:
             # Clean up
             final_video.close()
             final_audio.close()
+
             for clip in audio_clips:
                 clip.close()
             for clip in clips:
                 clip.close()
+
 
             return output_path
 
@@ -469,9 +540,9 @@ class EnhancedAdoptlyDemoCreator:
         if uploaded_file:
             try:
                 with st.expander("⚙️ Processing Settings", expanded=False):
-                    voice_speed = st.slider("Narration Speed", 0.8, 1.2, 1.0, 0.1)
-                    enable_transitions = st.checkbox("Enable Visual Transitions", value=True)
-                    high_quality = st.checkbox("High Quality Processing", value=True)
+                    voice_speed = st.slider("Narration Speed", 0.8, 1.2, 1.0, 0.1)  # Not currently used, but could be!
+                    enable_transitions = st.checkbox("Enable Visual Transitions", value=True)  # Already handled in create_video
+                    high_quality = st.checkbox("High Quality Processing", value=True)  # Could control bitrate, etc.
 
                 doc_content = ""
                 temp_file_path = None
@@ -506,7 +577,7 @@ class EnhancedAdoptlyDemoCreator:
                     progress_bar.progress(30)
 
                 # Generate and process script
-                if doc_content or video_content:
+                if doc_content or video_content:  # Use 'or', as either can now provide content
                     progress_text.text("Generating script...")
                     self.show_processing_animation("✍️ Creating natural narration")
                     script = self.enhance_script_generation(doc_content, video_content)
