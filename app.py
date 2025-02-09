@@ -18,6 +18,7 @@ import io
 import re
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+from scipy.io.wavfile import write
 
 # API Key configuration
 def initialize_api_keys():
