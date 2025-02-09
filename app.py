@@ -17,18 +17,6 @@ from dotenv import load_dotenv
 import io
 from scipy.io.wavfile import write
 import re
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# API Key configuration
-def initialize_api_keys():
-    """Initialize API key using Streamlit secrets."""
-    try:
-        openai.api_key = st.secrets["OPENAI_API_KEY"]
-        return True
-    except Exception as e:
-        st.error("OpenAI API key not found in Streamlit secrets. Please add it to your secrets.toml file.")
-        return False
 
 class EnhancedAdoptlyDemoCreator:
     def __init__(self):
@@ -36,89 +24,269 @@ class EnhancedAdoptlyDemoCreator:
         self.temp_dir = tempfile.mkdtemp()
 
     def setup_streamlit(self):
-        """Configure Streamlit page settings."""
+        """Initialize Streamlit UI configuration"""
         st.set_page_config(
-            page_title="Enhanced Adoptly Demo Creator",
+            page_title="Adoptly Demo Creator",
             page_icon="🎥",
             layout="wide"
         )
+        
+        # Add your existing CSS styles here
         st.markdown("""
         <style>
+        .main {
+            background-color: #f0f2f6;
+        }
+        .stButton>button {
+            background-color: #FF4B4B;
+            color: white;
+            border-radius: 10px;
+            padding: 10px 25px;
+            transition: all 0.3s ease;
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .upload-box {
+            border: 2px dashed #FF4B4B;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .upload-box:hover {
+            border-color: #ff7676;
+            background-color: rgba(255,75,75,0.05);
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 5px solid #28a745;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 5px solid #dc3545;
+        }
+        .status-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
         .processing-animation {
             text-align: center;
-            padding: 2rem;
+            padding: 20px;
         }
         .loader {
-            border: 4px solid #f3f3f3;
+            border: 5px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 4px solid #3498db;
+            border-top: 5px solid #FF4B4B;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 10px auto;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .header-container {
+            background: linear-gradient(90deg, #FF4B4B 0%, #FF8E53 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            color: white;
+            text-align: center;
+        }
         </style>
         """, unsafe_allow_html=True)
 
-    def setup_api_key(self):
-        """Setup API key."""
-        return initialize_api_keys()
+    def handle_errors(func):
+        """Decorator for error handling"""
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                return None
+        return wrapper
 
+    @handle_errors
     def extract_text_from_pdf(self, pdf_file):
-        """Extract text content from PDF with improved formatting."""
+        """Enhanced PDF text extraction with improved formatting"""
+        pdf = pdfium.PdfDocument(pdf_file)
+        text_content = []
+        
+        for page in pdf:
+            textpage = page.get_textpage()
+            text = textpage.get_text_range()
+            
+            # Clean and format the text
+            text = re.sub(r'\s+', ' ', text)  # Remove extra whitespace
+            text = text.replace('\n\n', '\n').strip()
+            
+            # Remove common unnecessary phrases
+            text = re.sub(r'(Click here|See more|Read more|Learn more|Continue reading)\b', '', text)
+            
+            text_content.append(text)
+        
+        return "\n".join(text_content)
+
+    @handle_errors
+    def generate_script(self, content):
+        """Generate natural, concise script without unnecessary words"""
         try:
-            pdf = pdfium.PdfDocument(pdf_file)
-            text_content = []
-            max_pages_process = 10
-            num_pages = len(pdf)
-            pages_to_process = min(num_pages, max_pages_process)
-
-            for page_number in range(pages_to_process):
-                page = pdf.get_page(page_number)
-                textpage = page.get_textpage()
-                text = textpage.get_text_range()
-                
-                # Clean and format the text
-                text = re.sub(r'\s+', ' ', text)  # Remove extra whitespace
-                text = text.replace('\n\n', '\n').strip()
-                text_content.append(text)
-
-            return " ".join(text_content)
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional video script writer creating concise, natural narrations. Focus on key information without filler words or unnecessary phrases."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Create a natural, engaging video script that:
+                        1. Focuses on core message and key points
+                        2. Uses conversational language
+                        3. Avoids unnecessary words and phrases
+                        4. Maintains natural flow
+                        5. Is optimized for voice narration
+                        
+                        Content to convert:
+                        {content}"""
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+            
+            script = response['choices'][0]['message']['content']
+            
+            # Post-process script to remove any remaining filler words
+            script = self.clean_script(script)
+            
+            return script
+            
         except Exception as e:
-            st.error(f"Error extracting text from PDF: {str(e)}")
+            st.error(f"Error generating script: {str(e)}")
             return None
 
-    def extract_images_from_pdf(self, pdf_path):
-        """Extract and enhance images from PDF."""
-        try:
-            pdf = pdfium.PdfDocument(pdf_path)
-            image_paths = []
-            max_pages_images = 5
-            num_pages = len(pdf)
-            pages_to_process = min(num_pages, max_pages_images)
+    def clean_script(self, script):
+        """Clean script by removing unnecessary words and phrases"""
+        # List of common filler words and phrases to remove
+        filler_words = [
+            r'\bbasically\b', r'\bactually\b', r'\bliterally\b',
+            r'\bso,\s', r'\bwell,\s', r'\byou see,\s',
+            r'\bas you can see\b', r'\bas mentioned\b',
+            r'\bin conclusion\b', r'\bto sum up\b'
+        ]
+        
+        # Remove filler words
+        for filler in filler_words:
+            script = re.sub(filler, '', script)
+        
+        # Clean up multiple spaces and newlines
+        script = re.sub(r'\s+', ' ', script)
+        script = re.sub(r'\n\s*\n', '\n\n', script)
+        
+        return script.strip()
 
-            for page_number in range(pages_to_process):
-                page = pdf.get_page(page_number)
-                pil_image = page.render().to_pil()
-                
-                # Enhance image quality
-                enhanced_image = self.enhance_image(pil_image)
-                
-                image_path = os.path.join(self.temp_dir, f"image_{page_number}.png")
-                enhanced_image.save(image_path, quality=95)
-                image_paths.append(image_path)
-
-            return image_paths
-        except Exception as e:
-            st.error(f"Error extracting images from PDF: {str(e)}")
+    @handle_errors
+    def create_audio(self, script):
+        """Create audio with natural pacing and breaks"""
+        if not script:
             return []
+            
+        audio_files = []
+        
+        # Split script into optimal chunks for natural narration
+        chunks = self.split_into_natural_chunks(script)
+        
+        for i, chunk in enumerate(chunks):
+            tts = gTTS(text=chunk, lang='en')
+            audio_path = os.path.join(self.temp_dir, f'audio_{i}.mp3')
+            tts.save(audio_path)
+            
+            # Add natural pause after each chunk
+            self.add_pause_to_audio(audio_path)
+            
+            audio_files.append(audio_path)
+            
+        return audio_files
+
+    def split_into_natural_chunks(self, script):
+        """Split script into natural chunks for better narration"""
+        # Split by sentences while preserving natural breaks
+        sentences = re.split(r'(?<=[.!?])\s+', script)
+        chunks = []
+        current_chunk = []
+        current_length = 0
+        
+        for sentence in sentences:
+            sentence_length = len(sentence)
+            
+            if current_length + sentence_length > 300:  # Optimal chunk size
+                if current_chunk:
+                    chunks.append(' '.join(current_chunk))
+                current_chunk = [sentence]
+                current_length = sentence_length
+            else:
+                current_chunk.append(sentence)
+                current_length += sentence_length
+        
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        return chunks
+
+    def add_pause_to_audio(self, audio_path):
+        """Add natural pause at the end of audio segments"""
+        try:
+            audio = AudioFileClip(audio_path)
+            silence = AudioFileClip(self.create_silence(0.3))  # 0.3 second pause
+            final_audio = concatenate_audioclips([audio, silence])
+            final_audio.write_audiofile(audio_path)
+        except Exception as e:
+            st.warning(f"Error adding pause to audio: {str(e)}")
+
+    def create_silence(self, duration):
+        """Create silent pause"""
+        silence_path = os.path.join(self.temp_dir, 'silence.mp3')
+        sample_rate = 44100
+        samples = np.zeros(int(duration * sample_rate))
+        write(silence_path, sample_rate, samples.astype(np.float32))
+        return silence_path
+
+    @handle_errors
+    def extract_images_from_pdf(self, pdf_file):
+        """Extract and enhance images from PDF"""
+        pdf = pdfium.PdfDocument(pdf_file)
+        image_paths = []
+        
+        for i, page in enumerate(pdf):
+            pil_image = page.render().to_pil()
+            
+            # Enhance image quality
+            enhanced_image = self.enhance_image(pil_image)
+            
+            image_path = os.path.join(self.temp_dir, f'slide_{i}.png')
+            enhanced_image.save(image_path)
+            image_paths.append(image_path)
+            
+        return image_paths
 
     def enhance_image(self, image):
-        """Enhance image quality for better video presentation."""
+        """Enhance image quality for better presentation"""
         try:
             # Convert PIL Image to OpenCV format
             cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -132,423 +300,211 @@ class EnhancedAdoptlyDemoCreator:
             st.warning(f"Image enhancement failed: {str(e)}")
             return image
 
-    def enhance_script_generation(self, content, video_content=None):
-        """Generate enhanced script with natural narration and improved timing."""
-        try:
-            # Extract key points from content
-            key_points = self.extract_key_points(content)
-            
-            if video_content:
-                # Calculate optimal pacing based on video duration
-                duration = video_content['timing_info']['duration']
-                segments = self.plan_video_segments(duration, key_points)
-                
-                video_prompt = f"""
-                Create a natural, engaging narration for a product demo video.
-                
-                Duration: {duration:.2f} seconds
-                Key Points to Cover:
-                {key_points}
-                
-                Segment Timing:
-                {segments}
-                
-                Guidelines:
-                1. Start with the core value proposition
-                2. Use natural, conversational language
-                3. Avoid artificial introductions or robotic language
-                4. Include smooth transitions between topics
-                5. Match the pacing to segment timings
-                6. Focus on benefits and impact
-                
-                Create a flowing narrative that sounds like an experienced presenter naturally explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
-                """
-            else:
-                # For PDF content
-                words = len(content.split())
-                estimated_duration = (words / 150) * 60  # 150 words per minute
-                segments = self.plan_video_segments(estimated_duration, key_points)
-                
-                video_prompt = f"""
-                Create a natural narration for a {estimated_duration:.0f}-second product demo.
-                
-                Key Points to Cover:
-                {key_points}
-                
-                Segment Timing:
-                {segments}
-                
-                Guidelines:
-                1. Focus on core benefits and value
-                2. Use natural, flowing language
-                3. Create clear transitions between topics
-                4. Match the pacing to segment timings
-                5. Sound conversational and engaging
-                
-                The narration should flow naturally like an experienced presenter explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
-                """
-
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert product presenter creating natural, engaging demo narrations."},
-                    {"role": "user", "content": video_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-
-            script = response.choices[0].message.content
-            return self.post_process_script(script)
-
-        except Exception as e:
-            st.error(f"Error in script generation: {str(e)}")
+    @handle_errors
+    def create_video(self, image_paths, audio_files):
+        """Create video with improved transitions and timing"""
+        if not image_paths or not audio_files:
             return None
-
-    def extract_key_points(self, content):
-        """Extract key points from content for better script structure."""
-        try:
-            prompt = f"""
-            Extract the key points from this content, focusing on:
-            1. Core value proposition
-            2. Main benefits
-            3. Key features
-            4. Important metrics or statistics
             
-            Content:
-            {content[:3000]}  # Limit content length for token constraints
-            """
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert at extracting key points from product documentation."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=500
-            )
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            st.warning(f"Error extracting key points: {str(e)}")
-            return content[:1000]  # Fallback to truncated content
-
-    def plan_video_segments(self, duration, key_points):
-        """Plan video segments with optimal timing."""
-        try:
-            prompt = f"""
-            Create a timing plan for a {duration:.0f}-second video covering these key points:
-            {key_points}
-            
-            Break the content into logical segments with timestamps, ensuring:
-            1. Proper pacing for each topic
-            2. Natural transitions
-            3. Time for viewer comprehension
-            """
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert at planning video timing and pacing."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=500
-            )
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            st.warning(f"Error planning segments: {str(e)}")
-            return f"Divide content evenly across {duration:.0f} seconds"
-
-    def post_process_script(self, script):
-        """Clean and format the generated script."""
-        # Remove multiple consecutive newlines
-        script = re.sub(r'\n{3,}', '\n\n', script)
+        clips = []
+        total_duration = 0
         
-        # Ensure timestamps are properly formatted
-        script = re.sub(r'\[(\d+):(\d+)\]', lambda m: f'[{int(m.group(1)):02d}:{int(m.group(2)):02d}]', script)
+        # Calculate total audio duration
+        audio_durations = []
+        for audio_file in audio_files:
+            audio_clip = AudioFileClip(audio_file)
+            audio_durations.append(audio_clip.duration)
+            total_duration += audio_clip.duration
+            audio_clip.close()
         
-        # Clean up any remaining artifacts
-        script = script.replace('AI:', '').replace('Narrator:', '').strip()
+        # Calculate time per image
+        time_per_image = total_duration / len(image_paths)
         
-        return script
-
-    def create_enhanced_audio(self, script):
-        """Create enhanced audio with improved pacing and natural breaks."""
-        try:
-            # Split script into segments based on timestamps and natural breaks
-            segments = self.split_script_into_segments(script)
+        for i, (img_path, duration) in enumerate(zip(image_paths, audio_durations)):
+            image_clip = ImageClip(img_path)
             
-            audio_files = []
-            for segment in segments:
-                # Clean the segment text
-                clean_text = self.clean_text_for_tts(segment)
-                
-                if clean_text:
-                    # Create audio with natural pacing
-                    tts = gTTS(text=clean_text, lang='en', slow=False)
-                    audio_path = os.path.join(self.temp_dir, f'audio_{len(audio_files)}.mp3')
-                    tts.save(audio_path)
-                    
-                    # Add slight pause after each segment
-                    self.add_pause_to_audio(audio_path)
-                    
-                    audio_files.append(audio_path)
-
-            return audio_files
-        except Exception as e:
-            st.error(f"Error creating audio: {str(e)}")
-            return None
-
-    def split_script_into_segments(self, script):
-        """Split script into natural segments for better audio generation."""
-        # Split by timestamps
-        timestamp_segments = re.split(r'\[\d{2}:\d{2}\]', script)
+            # Add transitions
+            image_clip = image_clip.set_duration(duration)
+            image_clip = image_clip.fadein(0.5).fadeout(0.5)
+            
+            clips.append(image_clip)
         
-        segments = []
-        for segment in timestamp_segments:
-            # Further split long segments by sentences
-            sentences = re.split(r'(?<=[.!?])\s+', segment.strip())
-            
-            current_segment = []
-            current_length = 0
-            
-            for sentence in sentences:
-                if current_length + len(sentence) > 300:  # Optimal length for TTS
-                    if current_segment:
-                        segments.append(' '.join(current_segment))
-                    current_segment = [sentence]
-                    current_length = len(sentence)
-                else:
-                    current_segment.append(sentence)
-                    current_length += len(sentence)
-            
-            if current_segment:
-                segments.append(' '.join(current_segment))
+        # Combine video and audio
+        final_video = concatenate_videoclips(clips)
+        audio_clips = [AudioFileClip(af) for af in audio_files]
+        final_audio = concatenate_audioclips(audio_clips)
+        final_video = final_video.set_audio(final_audio)
         
-        return [s for s in segments if s.strip()]
-
-    def clean_text_for_tts(self, text):
-        """Clean and format text for optimal TTS output."""
-        # Remove special characters and formatting
-        text = re.sub(r'[^\w\s.,!?-]', '', text)
+        # Write final video
+        output_path = os.path.join(self.temp_dir, 'final_video.mp4')
+        final_video.write_videofile(output_path, fps=24, codec='libx264')
         
-        # Normalize spacing
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Add breaks at punctuation
-        text = text.replace('.', '. ').replace('!', '! ').replace('?', '? ')
-        
-        return text
-
-    def add_pause_to_audio(self, audio_path):
-        """Add a natural pause at the end of audio segments."""
-        try:
-            audio = AudioFileClip(audio_path)
-            pause = AudioFileClip(self.create_pause(0.3))  # 0.3 second pause
-            final_audio = concatenate_audioclips([audio, pause])
-            final_audio.write_audiofile(audio_path)
-        except Exception as e:
-            st.warning(f"Error adding pause to audio: {str(e)}")
-
-    def create_pause(self, duration):
-        """Create a silent pause of specified duration."""
-        pause_path = os.path.join(self.temp_dir, 'pause.mp3')
-        silence = np.zeros(int(duration * 44100))  # 44100 Hz sample rate
-        write(pause_path, 44100, silence.astype(np.float32))
-        return pause_path
-
-    def create_video(self, image_paths, audio_files, background_path=None):
-        """Create video with improved timing and transitions."""
-        try:
-            if not image_paths or not audio_files:
-                st.error("No images or audio files available")
-                return None
-
-            clips = []
-            total_duration = 0
-
-            # Calculate total audio duration
-            audio_durations = []
-            for audio_file in audio_files:
-                audio_clip = AudioFileClip(audio_file)
-                audio_durations.append(audio_clip.duration)
-                total_duration += audio_clip.duration
-                audio_clip.close()
-
-            # Calculate time per image
-            time_per_image = total_duration / len(image_paths)
-            
-            for i, image_path in enumerate(image_paths):
-                # Create image clip with transition effects
-                image_clip = ImageClip(image_path)
-                
-                # Calculate duration for this image
-                if i < len(image_paths) - 1:
-                    duration = time_per_image
-                else:
-                    # Last image gets remaining time
-                    duration = total_duration - (time_per_image * (len(image_paths) - 1))
-                
-                image_clip = image_clip.set_duration(duration)
-                
-                # Add fade in/out effects
-                image_clip = image_clip.fadein(0.5).fadeout(0.5)
-                
-                if background_path:
-                    background = ImageClip(background_path).set_duration(duration)
-                    image_clip = CompositeVideoClip([background, image_clip.set_pos("center")])
-                
-                clips.append(image_clip)
-
-            # Combine video clips
-            final_video = concatenate_videoclips(clips, method="compose")
-            
-            # Combine audio files
-            audio_clips = [AudioFileClip(af) for af in audio_files]
-            final_audio = concatenate_audioclips(audio_clips)
-            
-            # Set audio to video
-            final_video = final_video.set_audio(final_audio)
-            
-            # Write final video
-            output_path = os.path.join(self.temp_dir, 'final_video.mp4')
-            final_video.write_videofile(output_path, fps=24, codec='libx264',
-                                      preset="medium", bitrate="5000k",
-                                      audio_codec='aac')
-
-            # Clean up
-            final_video.close()
-            final_audio.close()
-            for clip in audio_clips:
-                clip.close()
-            for clip in clips:
-                clip.close()
-
-            return output_path
-
-        except Exception as e:
-            st.error(f"Error creating video: {str(e)}")
-            return None
+        return output_path
 
     def show_processing_animation(self, message):
-        """Display processing animation with progress updates."""
+        """Display processing animation with message"""
         st.markdown(f"""
-            <div class="processing-animation">
-                <div class="loader"></div>
-                <p>{message}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        <div class="processing-animation">
+            <div class="loader"></div>
+            <p>{message}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     def main(self):
-        """Main application function with improved UI and processing flow."""
+        """Main application flow"""
+        # Header
         st.markdown("""
-            <div style="text-align: center; padding: 2rem; background: linear-gradient(90deg, #FF4B4B 0%, #FF8E53 100%); border-radius: 15px; margin-bottom: 2rem;">
-                <h1 style="color: white;">🎥 Adoptly Demo Creator</h1>
-                <p style="color: white; font-size: 1.2rem;">Create engaging product demos with natural AI narration</p>
-            </div>
-            """, unsafe_allow_html=True)
+        <div class="header-container">
+            <h1>🎥 Adoptly Demo Creator</h1>
+            <p style="font-size: 1.2rem;">Transform your presentations into engaging video demos powered by AI</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if not self.setup_api_key():
-            return
-
+        # Features Section
         st.markdown("""
-            <div style="padding: 1rem; background: #f8f9fa; border-radius: 10px; margin-bottom: 2rem;">
-                <h2>📤 Upload Your Content</h2>
-                <p>Transform your PDF or video into an engaging demo with natural narration</p>
-                <p>Supported formats: PDF, MP4</p>
+        <div style="display: flex; justify-content: space-around; margin: 2rem 0;">
+            <div class="status-card" style="flex: 1; margin: 0 10px;">
+                <h3>🤖 AI-Powered</h3>
+                <p>Smart script generation using GPT-4</p>
             </div>
-            """, unsafe_allow_html=True)
+            <div class="status-card" style="flex: 1; margin: 0 10px;">
+                <h3>🎯 Professional Voice</h3>
+                <p>Natural text-to-speech conversion</p>
+            </div>
+            <div class="status-card" style="flex: 1; margin: 0 10px;">
+                <h3>⚡ Fast Processing</h3>
+                <p>Quick video generation</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'mp4'])
-
+        # File Upload Section
+        st.markdown("""
+        <div class="upload-box">
+            <h2>📤 Upload Your Presentation</h2>
+            <p>Supported formats: PDF</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file = st.file_uploader("", type=['pdf'])
+        
         if uploaded_file:
             try:
-                with st.expander("⚙️ Processing Settings", expanded=False):
-                    voice_speed = st.slider("Narration Speed", 0.8, 1.2, 1.0, 0.1)
-                    enable_transitions = st.checkbox("Enable Visual Transitions", value=True)
-                    high_quality = st.checkbox("High Quality Processing", value=True)
+                # Save uploaded file
+                temp_file_path = os.path.join(self.temp_dir, uploaded_file.name)
+                with open(temp_file_path, 'wb') as f:
+                    f.write(uploaded_file.getvalue())
 
-                doc_content = ""
-                temp_file_path = None
-                image_paths = []
-                video_content = None
-                audio_files = []
-                script = None
-
-                # Process uploaded file
-                file_type = uploaded_file.type
-                progress_text = st.empty()
-                progress_bar = st.progress(0)
-
-                if file_type == 'application/pdf':
-                    progress_text.text("Processing PDF...")
-                    self.show_processing_animation("📄 Analyzing document content")
-                    temp_file_path = os.path.join(self.temp_dir, uploaded_file.name)
-                    with open(temp_file_path, 'wb') as f:
-                        f.write(uploaded_file.getvalue())
-                    doc_content = self.extract_text_from_pdf(temp_file_path)
-                    image_paths = self.extract_images_from_pdf(temp_file_path)
-                    progress_bar.progress(30)
-
-                elif file_type == 'video/mp4':
-                    progress_text.text("Processing video...")
-                    self.show_processing_animation("🎥 Analyzing video content")
-                    video_content = self.process_video_content(uploaded_file)
-                    if video_content is None:
-                        st.error("Video processing failed")
+                # Content Extraction
+                with st.spinner(""):
+                    self.show_processing_animation("📄 Extracting content from your presentation...")
+                    content = self.extract_text_from_pdf(temp_file_path)
+                    if content:
+                        st.markdown('<div class="success-message">✅ Content extracted successfully</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div class="error-message">❌ Failed to extract content</div>', unsafe_allow_html=True)
                         return
-                    image_paths = video_content.get('image_paths', [])
-                    progress_bar.progress(30)
 
-                # Generate and process script
-                if doc_content or video_content:
-                    progress_text.text("Generating script...")
-                    self.show_processing_animation("✍️ Creating natural narration")
-                    script = self.enhance_script_generation(doc_content, video_content)
-                    progress_bar.progress(60)
-
+                # Script Generation
+                with st.spinner(""):
+                    self.show_processing_animation("🤖 Generating engaging script with AI...")
+                    script = self.generate_script(content)
                     if script:
-                        progress_text.text("Creating audio...")
-                        self.show_processing_animation("🎤 Generating voice narration")
-                        audio_files = self.create_enhanced_audio(script)
-                        progress_bar.progress(80)
+                        st.markdown('<div class="success-message">✅ Script generated successfully</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div class="error-message">❌ Failed to generate script</div>', unsafe_allow_html=True)
+                        return
 
-                        if audio_files:
-                            progress_text.text("Creating final video...")
-                            self.show_processing_animation("🎬 Assembling final video")
-                            video_path = self.create_video(image_paths, audio_files)
-                            progress_bar.progress(100)
-                            progress_text.empty()
+                # Audio Creation
+                with st.spinner(""):
+                    self.show_processing_animation("🎤 Creating professional voiceover...")
+                    audio_files = self.create_audio(script)
+                    if audio_files:
+                        st.markdown('<div class="success-message">✅ Audio created successfully</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div class="error-message">❌ Failed to create audio</div>', unsafe_allow_html=True)
+                        return
 
-                            if video_path and os.path.exists(video_path):
-                                st.success("🎉 Your demo video is ready!")
-                                
-                                # Display video and download options
-                                col1, col2 = st.columns([2, 1])
-                                with col1:
-                                    st.video(video_path)
-                                with col2:
-                                    with open(video_path, "rb") as file:
-                                        st.download_button(
-                                            label="⬇️ Download Video",
-                                            data=file,
-                                            file_name="adoptly_demo.mp4",
-                                            mime="video/mp4"
-                                        )
-                                    
-                                    if st.button("📝 View Script"):
-                                        st.markdown("### Generated Script")
-                                        st.markdown(script)
+                # Slide Processing
+                with st.spinner(""):
+                    self.show_processing_animation("🖼️ Processing presentation slides...")
+                    image_paths = self.extract_images_from_pdf(temp_file_path)
+                    if image_paths:
+                        st.markdown('<div class="success-message">✅ Slides processed successfully</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div class="error-message">❌ Failed to process slides</div>', unsafe_allow_html=True)
+                        return
+
+                # Video Creation
+                with st.spinner(""):
+                    self.show_processing_animation("🎬 Creating your video demo...")
+                    video_path = self.create_video(image_paths, audio_files)
+
+                if video_path and os.path.exists(video_path):
+                    st.markdown("""
+                    <div class="success-message" style="text-align: center;">
+                        <h2>🎉 Your video demo is ready!</h2>
+                        <p>Preview your video below and download when ready.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Video Preview
+                    st.video(video_path)
+                    
+                    # Script Review and Download Options
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        with st.expander("📝 View Generated Script"):
+                            st.markdown(f"""
+                            <div class="status-card">
+                                <h4>Generated Script:</h4>
+                                <p style="white-space: pre-line;">{script}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        with open(video_path, 'rb') as f:
+                            video_bytes = f.read()
+                            st.download_button(
+                                label="⬇️ Download Video Demo",
+                                data=video_bytes,
+                                file_name="adoptly_demo.mp4",
+                                mime="video/mp4",
+                            )
+                        
+                        st.markdown("""
+                        <div class="status-card">
+                            <h4>Video Details:</h4>
+                            <ul>
+                                <li>Format: MP4</li>
+                                <li>Quality: HD</li>
+                                <li>Audio: Stereo</li>
+                            </ul>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="error-message">❌ Failed to create video</div>', unsafe_allow_html=True)
 
             except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                import traceback
-                st.error(traceback.format_exc())
+                st.markdown(f'<div class="error-message">❌ An error occurred: {str(e)}</div>', unsafe_allow_html=True)
+                st.info("Please try again or contact support if the issue persists.")
+
+        # Footer
+        st.markdown("""
+        <div style="text-align: center; margin-top: 50px; padding: 20px;">
+            <p>Made with ❤️ by Adoptly | Need help? Contact support@adoptly.io</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def initialize_api_keys():
+    """Initialize API key using Streamlit secrets."""
+    try:
+        openai.api_key = st.secrets["OPENAI_API_KEY"]
+        return True
+    except Exception as e:
+        st.error("OpenAI API key not found in Streamlit secrets. Please add it to your secrets.toml file.")
+        return False
 
 if __name__ == "__main__":
     app = EnhancedAdoptlyDemoCreator()
