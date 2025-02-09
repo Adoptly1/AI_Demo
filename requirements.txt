@@ -13,8 +13,9 @@ gTTS==2.4.0
 python-pptx==0.6.21
 python-magic
 pytesseract==0.3.10  # For OCR
-opencv-python-headless==4.8.0.76  # Add OpenCV (headless version)
+opencv-python-headless==4.8.0.76  # OpenCV (headless version)
 rich==13.9.4
 pygments==2.19.1
 markdown-it-py==3.0.0
 mdurl==0.1.2
+python-dotenv==1.0.0  # Add dotenv for environment variable support
