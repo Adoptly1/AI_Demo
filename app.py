@@ -23,7 +23,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 load_dotenv()
 
 # API Key configuration
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
 
 def initialize_api_keys():
     """Initialize API key."""
