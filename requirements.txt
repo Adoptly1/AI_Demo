@@ -1,4 +1,4 @@
-pip==24.0  # Avoid the latest pip version if it's causing conflicts
+pip==24.0  # Avoid latest pip issues
 setuptools>=68.0.0
 wheel
 streamlit==1.31.0
@@ -12,7 +12,8 @@ openai==0.28.1
 gTTS==2.4.0
 python-pptx==0.6.21
 python-magic
-rich==13.9.4  # Explicitly define rich version
-pygments==2.19.1  # Explicitly define pygments version
-markdown-it-py==3.0.0  # Avoid auto reinstallation issues
-mdurl==0.1.2  # Avoid auto reinstallation issues
+pytesseract==0.3.10  # Add pytesseract for OCR
+rich==13.9.4
+pygments==2.19.1
+markdown-it-py==3.0.0
+mdurl==0.1.2
