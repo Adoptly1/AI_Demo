@@ -381,7 +381,7 @@ class EnhancedAdoptlyDemoCreator:
             # Time duration on pictures to balance each picture. This make no error like division by zero
             time_per_image = total_duration / len(image_paths) if len(image_paths) > 0 else 0
             audio_clip_index = 0 # pointer that indicates which audio clip needs to get in play
-            current_audio_time = 0
+            current_audio_time = 0  # Initialize the time counter
 
             for i, image_path in enumerate(image_paths):
                 image_clip = ImageClip(image_path)
