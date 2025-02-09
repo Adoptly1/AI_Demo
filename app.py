@@ -69,7 +69,7 @@ class EnhancedAdoptlyDemoCreator:
         return initialize_api_keys()
 
     def extract_text_from_pdf(self, pdf_file):
-        """Extract text content from PDF."""
+        """Extract text content from PDF with improved formatting."""
         try:
             pdf = pdfium.PdfDocument(pdf_file)
             text_content = []
@@ -161,67 +161,66 @@ class EnhancedAdoptlyDemoCreator:
             return image
 
     def enhance_script_generation(self, content, video_content=None):
-        """Generate enhanced script with natural narration and improved timing."""
+        """Generate a script, including an introduction for the demo creator,
+           followed by the content of the uploaded file.  The AI will be more "human"
+           with added greetings, etc.
+        """
         try:
-            # Extract key points from content
+            intro = "Hey there!  I'm the Adoptly Demo Creator.  I'm excited to help you create a demo of your product! I've reviewed the material you provided, and I'm ready to give you a demo!  Here we go!"  # more friendly tone
+
             key_points = self.extract_key_points(content)
-            
+
             if video_content:
-                # Calculate optimal pacing based on video duration
                 duration = video_content['timing_info']['duration']
                 segments = self.plan_video_segments(duration, key_points)
-                
-                video_prompt = f"""
-                Create a natural, engaging narration for a product demo video.
-                
-                Duration: {duration:.2f} seconds
-                Key Points to Cover:
-                {key_points}
-                
-                Segment Timing:
-                {segments}
-                
-                Guidelines:
-                1. Start with the core value proposition
-                2. Use natural, conversational language
-                3. Avoid artificial introductions or robotic language
-                4. Include smooth transitions between topics
-                5. Match the pacing to segment timings
-                6. Focus on benefits and impact
-                
-                Create a flowing narrative that sounds like an experienced presenter naturally explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
-                """
-            else:
-                # For PDF content
-                words = len(content.split())
-                estimated_duration = (words / 150) * 60  # 150 words per minute
-                segments = self.plan_video_segments(estimated_duration, key_points)
-                
-                video_prompt = f"""
-                Create a natural narration for a {estimated_duration:.0f}-second product demo.
-                
-                Key Points to Cover:
-                {key_points}
-                
-                Segment Timing:
-                {segments}
-                
-                Guidelines:
-                1. Focus on core benefits and value
-                2. Use natural, flowing language
-                3. Create clear transitions between topics
-                4. Match the pacing to segment timings
-                5. Sound conversational and engaging
-                
-                The narration should flow naturally like an experienced presenter explaining the product.
-                Use minimal timestamps, only marking major transitions with [MM:SS].
-                """
 
+                video_prompt = f"""
+                {intro}
+
+                Alright, let's get to work. I'm creating a video, and here's the script:
+                - Duration: {duration:.2f} seconds
+                - Key Points:
+                {key_points}
+                - Here's the time breakdown:
+                {segments}
+
+                Follow these guidelines:
+                1.  I'm starting with the core value.
+                2.  Keep it natural and conversational.
+                3.  Create smooth transitions.
+                4.  Match my pacing to the time segments.
+                5.  Highlight the benefits, the impact.
+
+                Create a good flow. Use timestamps to highlight key moments like [MM:SS].
+                """
+            else:  # PDF content
+                words = len(content.split())
+                estimated_duration = (words / 150) * 60
+                segments = self.plan_video_segments(estimated_duration, key_points)
+
+                video_prompt = f"""
+                {intro}
+
+                Okay, I have created the demo for you. The demo is for  {estimated_duration:.0f} seconds:
+
+                - Core Information:
+                {key_points}
+                - Here is timing plans for content:
+                {segments}
+                Follow the guidelines below
+                1. Focus on user gain and what you'll benefit from
+                2.  Keep a natural conversational style.
+                3. Create smooth transitions.
+                4. Make pacing to fit duration.
+                5. Use conversational words.
+
+                I want the video to be conversational.
+                Please mark and follow these time stamps (like \[MM:SS])
+                """
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert product presenter creating natural, engaging demo narrations."},
+                    {"role": "system", "content": "Expert presenter creating natural, engaging demo narration."},
                     {"role": "user", "content": video_prompt}
                 ],
                 temperature=0.7,
@@ -306,49 +305,44 @@ class EnhancedAdoptlyDemoCreator:
         return script
 
     def create_enhanced_audio(self, script):
-        """Create enhanced audio with improved pacing and natural breaks."""
+        """Create enhanced audio with improved pacing and natural breaks.
+        Split into natural segments for good gTTS output.
+        """
         try:
             # Split script into segments based on *sentences*
             segments = self.split_script_into_segments(script)
-            
+
             audio_files = []
             for segment in segments:
-                # Clean the segment text
                 clean_text = self.clean_text_for_tts(segment)
-                
+
                 if clean_text:
-                    # Create audio with natural pacing
                     tts = gTTS(text=clean_text, lang='en', slow=False)
                     audio_path = os.path.join(self.temp_dir, f'audio_{len(audio_files)}.mp3')
                     tts.save(audio_path)
-                    
-                    # Add slight pause after each segment
-                    self.add_pause_to_audio(audio_path)
-                    
+                    self.add_pause_to_audio(audio_path) # small pauses
                     audio_files.append(audio_path)
-
             return audio_files
         except Exception as e:
             st.error(f"Error creating audio: {str(e)}")
             return None
 
+
     def split_script_into_segments(self, script):
-        """Split script into natural segments for better audio generation. Split by sentence."""
+        """Split script into natural segments for better audio generation.
+           Split by sentence.
+        """
         sentences = re.split(r'(?<=[.!?])\s+', script.strip())
         return [s for s in sentences if s.strip()]
 
+
     def clean_text_for_tts(self, text):
         """Clean and format text for optimal TTS output."""
-        # Remove special characters and formatting
-        text = re.sub(r'[^\w\s.,!?-]', '', text)
-        
-        # Normalize spacing
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Add breaks at punctuation
-        text = text.replace('.', '. ').replace('!', '! ').replace('?', '? ')
-        
+        text = re.sub(r'[^\w\s.,!?-]', '', text)  # Remove special characters
+        text = re.sub(r'\s+', ' ', text).strip()  # Normalize spacing
+        text = text.replace('.', '. ').replace('!', '! ').replace('?', '? ') # Add break at punctuation
         return text
+
 
     def add_pause_to_audio(self, audio_path):
         """Add a natural pause at the end of audio segments."""
@@ -359,6 +353,7 @@ class EnhancedAdoptlyDemoCreator:
             final_audio.write_audiofile(audio_path)
         except Exception as e:
             st.warning(f"Error adding pause to audio: {str(e)}")
+
 
     def create_pause(self, duration):
         """Create a silent pause of specified duration."""
@@ -387,39 +382,39 @@ class EnhancedAdoptlyDemoCreator:
 
             # Calculate time per image
             time_per_image = total_duration / len(image_paths)
-            
+
             for i, image_path in enumerate(image_paths):
                 # Create image clip with transition effects
                 image_clip = ImageClip(image_path)
-                
+
                 # Calculate duration for this image
                 if i < len(image_paths) - 1:
                     duration = time_per_image
                 else:
                     # Last image gets remaining time
                     duration = total_duration - (time_per_image * (len(image_paths) - 1))
-                
+
                 image_clip = image_clip.set_duration(duration)
-                
+
                 # Add fade in/out effects
                 image_clip = image_clip.fadein(0.5).fadeout(0.5)
-                
+
                 if background_path:
                     background = ImageClip(background_path).set_duration(duration)
                     image_clip = CompositeVideoClip([background, image_clip.set_pos("center")])
-                
+
                 clips.append(image_clip)
 
             # Combine video clips
             final_video = concatenate_videoclips(clips, method="compose")
-            
+
             # Combine audio files
             audio_clips = [AudioFileClip(af) for af in audio_files]
             final_audio = concatenate_audioclips(audio_clips)
-            
+
             # Set audio to video
             final_video = final_video.set_audio(final_audio)
-            
+
             # Write final video
             output_path = os.path.join(self.temp_dir, 'final_video.mp4')
             final_video.write_videofile(output_path, fps=24, codec='libx264',
