@@ -36,33 +36,101 @@ class EnhancedAdoptlyDemoCreator:
         self.temp_dir = tempfile.mkdtemp()
 
     def setup_streamlit(self):
-        """Configure Streamlit page settings."""
         st.set_page_config(
-            page_title="Enhanced Adoptly Demo Creator",
+            page_title="Adoptly Demo Creator",
             page_icon="🎥",
             layout="wide"
         )
+        
         st.markdown("""
         <style>
+        .main {
+            background-color: #f0f2f6;
+        }
+        .stButton>button {
+            background-color: #FF4B4B;
+            color: white;
+            border-radius: 10px;
+            padding: 10px 25px;
+            transition: all 0.3s ease;
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .upload-box {
+            border: 2px dashed #FF4B4B;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .upload-box:hover {
+            border-color: #ff7676;
+            background-color: rgba(255,75,75,0.05);
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 5px solid #28a745;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 5px solid #dc3545;
+        }
+        .status-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
         .processing-animation {
             text-align: center;
-            padding: 2rem;
+            padding: 20px;
         }
         .loader {
-            border: 4px solid #f3f3f3;
+            border: 5px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 4px solid #3498db;
+            border-top: 5px solid #FF4B4B;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 10px auto;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .header-container {
+            background: linear-gradient(90deg, #FF4B4B 0%, #FF8E53 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            color: white;
+            text-align: center;
+        }
         </style>
         """, unsafe_allow_html=True)
+
+    def handle_errors(func):
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                return None
+        return wrapper
+    
+    @handle_errors
 
     def setup_api_key(self):
         """Setup API key."""
@@ -123,6 +191,43 @@ class EnhancedAdoptlyDemoCreator:
             st.warning(f"Image enhancement failed: {str(e)}")
             return image
 
+    def process_video_content(self, video_file):
+        """Processes the uploaded video file to extract frames and duration."""
+        try:
+            # Save the video file temporarily
+            temp_video_path = os.path.join(self.temp_dir, video_file.name)
+            with open(temp_video_path, "wb") as f:
+                f.write(video_file.getbuffer())  # Use getbuffer() for BytesIO
+
+            # Extract frames and duration using moviepy
+            video_clip = VideoFileClip(temp_video_path)
+            duration = video_clip.duration
+            fps = video_clip.fps
+            num_frames = int(duration * fps)
+
+            image_paths = []
+            # Extract a limited number of frames (e.g., 5)
+            max_frames = 5
+            for i in range(min(max_frames, num_frames)):
+                frame_time = i * (duration / min(max_frames, num_frames))
+                frame = video_clip.to_ImageClip(frame_time).to_array()
+                frame_image = Image.fromarray(frame)
+                enhanced_frame = self.enhance_image(frame_image)
+                image_path = os.path.join(self.temp_dir, f"frame_{i}.png")
+                enhanced_frame.save(image_path)
+                image_paths.append(image_path)
+
+            video_clip.close()  # Close the video clip after use
+
+            return {
+                'image_paths': image_paths,
+                'timing_info': {'duration': duration}
+            }
+
+        except Exception as e:
+            st.error(f"Error processing video: {str(e)}")
+            return None
+
     def enhance_script_generation(self, content, video_content=None):
         """Generate enhanced script with natural narration and improved timing."""
         try:
@@ -182,7 +287,7 @@ class EnhancedAdoptlyDemoCreator:
                 """
 
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert product presenter creating natural, engaging demo narrations."},
                     {"role": "user", "content": video_prompt}
@@ -213,7 +318,7 @@ class EnhancedAdoptlyDemoCreator:
             """
             
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert at extracting key points from product documentation."},
                     {"role": "user", "content": prompt}
@@ -241,7 +346,7 @@ class EnhancedAdoptlyDemoCreator:
             """
             
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert at planning video timing and pacing."},
                     {"role": "user", "content": prompt}
