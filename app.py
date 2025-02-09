@@ -24,7 +24,7 @@ def initialize_api_keys():
         st.error("OpenAI API key not found in Streamlit secrets. Please add it to your secrets.toml file.")
         return False
 
-class AI_Demo_Creator:
+class EnhancedAdoptlyDemoCreator:
     def __init__(self):
         self.setup_streamlit()
         self.temp_dir = tempfile.mkdtemp()
@@ -70,20 +70,22 @@ class AI_Demo_Creator:
         """Filter out unnecessary scene directions and formatting text."""
         script = re.sub(r'\[.*?\]', '', script)  # Remove any bracketed instructions like [Scene:], [END]
         script = re.sub(r'\(.*?\)', '', script)  # Remove any parenthetical instructions
-        script = re.sub(r'(?i)fade out|cut to|scene|transition|opening scene|closing scene', '', script)  # Remove common scene-related words
-        return script.strip()
+        script = re.sub(r'(?i)fade out|cut to|scene|transition|opening scene|closing scene', '', script)  # Remove scene-related words
+        script = script.replace("Narrator (V.O.):", "").strip()  # Remove redundant narrator tags
+        return script
 
     def enhance_script_generation(self, content):
-        """Generate AI script without unnecessary words or visuals."""
+        """Generate AI script with a natural, engaging storytelling style."""
         try:
             prompt = f"""
             You are an expert in writing engaging demo scripts. Create a smooth, human-like narration for a product demo.
 
             **Instructions:**
-            - Do **not** include on-screen elements (e.g., "Fade in", "Cut to", "Opening Scene").
-            - Remove unnecessary formatting elements like [Scene:], [END], [INTRO].
-            - Ensure the narration is **natural and engaging**.
+            - Do **not** describe on-screen elements (e.g., "Fade in", "Cut to", "Opening Scene").
+            - Focus on **storytelling**—explain the product in a compelling, engaging way.
+            - Ensure the narration is **natural and conversational**.
             - Avoid robotic, overly structured, or overly formal language.
+            - Keep the focus on the **value and experience of using the product**.
 
             **Content to Use:**
             {content[:3000]}
@@ -169,5 +171,5 @@ class AI_Demo_Creator:
                                 st.download_button("⬇️ Download Video", open(video_path, "rb"), "AI_Demo.mp4", "video/mp4")
 
 if __name__ == "__main__":
-    app = AI_Demo_Creator()
+    app = EnhancedAdoptlyDemoCreator()
     app.main()
