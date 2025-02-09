@@ -12,3 +12,5 @@ openai==0.28.1
 gTTS==2.4.0
 python-pptx==0.6.21
 python-magic
+tempfile
+base64
