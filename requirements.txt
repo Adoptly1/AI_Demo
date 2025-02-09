@@ -1,4 +1,4 @@
-pip==24.0
+pip==24.0  # Avoid the latest pip version if it's causing conflicts
 setuptools>=68.0.0
 wheel
 streamlit==1.31.0
@@ -12,5 +12,7 @@ openai==0.28.1
 gTTS==2.4.0
 python-pptx==0.6.21
 python-magic
-tempfile
-base64
+rich==13.9.4  # Explicitly define rich version
+pygments==2.19.1  # Explicitly define pygments version
+markdown-it-py==3.0.0  # Avoid auto reinstallation issues
+mdurl==0.1.2  # Avoid auto reinstallation issues
