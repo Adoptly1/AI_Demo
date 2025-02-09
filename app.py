@@ -2,11 +2,9 @@ import streamlit as st
 import os
 from PIL import Image
 import pypdfium2 as pdfium
-# pandas and pathlib aren't directly used, but are good practice for file handling
-# so I'm leaving them.  Remove if you're *sure* you don't need them.
 import pandas as pd
-from pathlib import Path  # Not strictly needed
-import time # Time functions included. Can be deleted without damage.
+from pathlib import Path
+import time
 from moviepy.editor import *
 import openai
 from gtts import gTTS
@@ -15,9 +13,9 @@ import base64
 import pytesseract
 import cv2
 import numpy as np
-from dotenv import load_dotenv # Not actively used
-import io # not used actively.
-import re # RE operations
+from dotenv import load_dotenv
+import io
+import re
 from scipy.io.wavfile import write
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -177,58 +175,62 @@ class EnhancedAdoptlyDemoCreator:
             st.error(f"Error processing video: {str(e)}")
             return None
 
+
     def enhance_script_generation(self, content, video_content=None):
-        """Generate script, including intro of AI and the main product."""
+        """Generate a script, including an introduction for the demo creator,
+           followed by the content of the uploaded file.  The AI will be more "human"
+           with added greetings, etc.
+        """
         try:
-            intro = "Hello! I'm Adoptly Demo Creator. I've analyzed the provided content. I will guide you through a quick demonstration of the key features and benefits."
+            intro = "Hey there!  I'm the Adoptly Demo Creator.  I'm excited to help you create a demo of your product! I've reviewed the material you provided, and I'm ready to give you a demo!  Here we go!"  # more friendly tone
 
             key_points = self.extract_key_points(content)
 
             if video_content:
                 duration = video_content['timing_info']['duration']
                 segments = self.plan_video_segments(duration, key_points)
+
                 video_prompt = f"""
                 {intro}
 
-                Here is your product demo, targeted for {duration:.2f} seconds:
-
-                Key points to highlight are:
+                Alright, let's get to work. I'm creating a video, and here's the script:
+                - Duration: {duration:.2f} seconds
+                - Key Points:
                 {key_points}
-
-                Video segment timing details:
+                - Here's the time breakdown:
                 {segments}
 
-                Adhere to these points:
-                1. Focus on core value propositions at the begining
-                2. keep sentences easy to listen, like conversational
-                3. Smooth and clear transition from topics to topics.
-                4. Segment timings needs to followed as told.
-                5. Prioritize and speak benefits of product more often.
+                Follow these guidelines:
+                1.  I'm starting with the core value.
+                2.  Keep it natural and conversational.
+                3.  Create smooth transitions.
+                4.  Match my pacing to the time segments.
+                5.  Highlight the benefits, the impact.
 
-                Please create the presentation keeping conversation approach in mind. Include some brief and minimal timestamps like \[MM:SS] marking transition periods
+                Create a good flow. Use timestamps to highlight key moments like [MM:SS].
                 """
-            else: # for PDFs:
+            else:  # PDF content
                 words = len(content.split())
                 estimated_duration = (words / 150) * 60
                 segments = self.plan_video_segments(estimated_duration, key_points)
+
                 video_prompt = f"""
                 {intro}
 
-                Here is your product demo for about {estimated_duration:.0f} seconds:
+                Okay, I have created the demo for you. The demo is for  {estimated_duration:.0f} seconds:
 
-                Core information to discuss are:
+                - Core Information:
                 {key_points}
-
-                Please, use this for your timing segment plans:
+                - Here is timing plans for content:
                 {segments}
+                Follow the guidelines below
+                1. Focus on user gain and what you'll benefit from
+                2.  Keep a natural conversational style.
+                3. Create smooth transitions.
+                4. Make pacing to fit duration.
+                5. Use conversational words.
 
-                Please follow guidelines below
-                1. Focus on what user gain and what you'll benefit from
-                2. Create natural flow with sentence, keep conversations flow running
-                3. Create transitions for the topic and create them smooth.
-                4. segment durations should match to give an optimal pacing.
-                5. Use conversational ton of words in speaking
-                I want the video should be conversational.
+                I want the video to be conversational.
                 Please mark and follow these time stamps (like \[MM:SS])
                 """
             response = openai.ChatCompletion.create(
@@ -247,18 +249,18 @@ class EnhancedAdoptlyDemoCreator:
             st.error(f"Error in script generation: {str(e)}")
             return None
 
+
     def extract_key_points(self, content):
         """Extract key points from content"""
         try:
             prompt = f"""
-            Identify and pull the key points. Prioritize these when summarizing
-            1. Value propositions that matter
-            2. Primary benefits
-            3. Primary functions and features
-            4. Important metrics that describe it
-
+            Identify and pull the key points. Prioritize these when summarizing:
+            1. Value propositions
+            2. Benefits
+            3. Features
+            4. Metrics
             Content:
-            {content[:3000]} # limiting for tokens
+            {content[:3000]}  # limit for tokens
             """
             response = openai.ChatCompletion.create(
                 model="gpt-4",
@@ -273,18 +275,19 @@ class EnhancedAdoptlyDemoCreator:
             return response.choices[0].message.content
         except Exception as e:
             st.warning(f"Error extracting key points: {str(e)}")
-            return content[:1000] # default fallback
+            return content[:1000]  # default fallback
 
 
     def plan_video_segments(self, duration, key_points):
         """Plan video segments."""
         try:
             prompt = f"""
-            Plan the content to build demo. The time limit you have is {duration:.0f} seconds and focus is:
+            Create a timing plan based on this to build demo. The time limit you have is {duration:.0f} seconds and focus is:
             {key_points}
-            Here is timing breakdown:
-            1. Give great pace.
-            2. create clean transitions for viewer to understand and think.
+
+            Create a timing breakdown:
+            1. Pace content well.
+            2. Create transitions to help user to think and understand.
             """
 
             response = openai.ChatCompletion.create(
@@ -303,7 +306,7 @@ class EnhancedAdoptlyDemoCreator:
 
 
     def post_process_script(self, script):
-        """Process to make good output format."""
+        """Process for format.  Remove artifacts, and make sure the timestamps are correct."""
         script = re.sub(r'\n{3,}', '\n\n', script) # cleanup multiple \n
         script = re.sub(r'\[(\d+):(\d+)\]', lambda m: f'[{int(m.group(1)):02d}:{int(m.group(2)):02d}]', script)
         script = script.replace('AI:','').replace('Narrator:','').strip() #removing artifacts from processing steps
@@ -311,7 +314,7 @@ class EnhancedAdoptlyDemoCreator:
         return script
 
     def create_enhanced_audio(self, script):
-        """Generate better quality audio files without stutter."""
+        """Generate better quality audio files without stutter, by splitting by sentences."""
         try:
             segments = self.split_script_into_segments(script)
             audio_files = []
@@ -332,7 +335,8 @@ class EnhancedAdoptlyDemoCreator:
 
 
     def split_script_into_segments(self, script):
-        """Break script into shorter segment to reduce stutter and break from sentences to increase efficiency."""
+        """Split script into natural segments based on *sentences* for TTS."""
+        # Split by sentences.  This is the KEY to avoiding repetition.
         sentences = re.split(r'(?<=[.!?])\s+', script.strip())
         return [s for s in sentences if s.strip()]
 
