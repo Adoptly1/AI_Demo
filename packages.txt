@@ -1,0 +1,6 @@
+pkg-config
+ninja-build
+build-essential
+libpq-dev
+python3-pip
+python3-dev
