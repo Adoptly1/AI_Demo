@@ -2,7 +2,9 @@ import streamlit as st
 import os
 from PIL import Image
 import pypdfium2 as pdfium
-import pandas as pd # Not strictly needed, but good practice
+# pandas and pathlib aren't directly used, but are good practice for file handling
+# so I'm leaving them.  Remove if you're *sure* you don't need them.
+import pandas as pd
 from pathlib import Path  # Not strictly needed
 import time # Time functions included. Can be deleted without damage.
 from moviepy.editor import *
@@ -368,6 +370,7 @@ class EnhancedAdoptlyDemoCreator:
 
             clips = []
             total_duration = 0
+            # Set current_audio_time by adding the the current segment
 
             #Calculate audio for full content by concatenating all audio clips
             for audio_file in audio_files:
@@ -378,6 +381,7 @@ class EnhancedAdoptlyDemoCreator:
             # Time duration on pictures to balance each picture. This make no error like division by zero
             time_per_image = total_duration / len(image_paths) if len(image_paths) > 0 else 0
             audio_clip_index = 0 # pointer that indicates which audio clip needs to get in play
+            current_audio_time = 0
 
             for i, image_path in enumerate(image_paths):
                 image_clip = ImageClip(image_path)
@@ -401,7 +405,7 @@ class EnhancedAdoptlyDemoCreator:
                 image_clip = image_clip.set_pos("center") # keep this to keep a nice central point
                 clips.append(image_clip)
 
-                current_audio_time = audio_duration  # update
+                current_audio_time += image_duration  # update the current clip duration here!
                 #audio_clip = AudioFileClip(audio_files[audio_clip_index])
                 if current_audio_time >= sum(AudioFileClip(af).duration for af in audio_files[:audio_clip_index+1]): # sync
                     audio_clip_index +=1 # increase number of play
