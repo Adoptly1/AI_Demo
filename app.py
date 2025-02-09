@@ -1,3 +1,4 @@
+
 import streamlit as st
 import os
 from PIL import Image
@@ -457,7 +458,7 @@ class EnhancedAdoptlyDemoCreator:
             """, unsafe_allow_html=True)
 
         uploaded_file = st.file_uploader("Upload Document (PDF) or Video (MP4)", type=['pdf', 'mp4'])
-        background_file = st.file_uploader("Upload Background Image (Optional)", type=['png', 'jpg', 'jpeg'])
+    
 
         if uploaded_file:
             try:
@@ -469,12 +470,6 @@ class EnhancedAdoptlyDemoCreator:
                 script = None
                 background_image_path = None
 
-                # Process background image if uploaded
-                if background_file:
-                    background_image_path = os.path.join(self.temp_dir, background_file.name)
-                    with open(background_image_path, 'wb') as f:
-                        f.write(background_file.getvalue())
-                    st.image(background_image_path, caption="Uploaded Background Image", width=200)
 
                 # Process the uploaded file based on its type
                 file_type = uploaded_file.type
