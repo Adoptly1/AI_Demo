@@ -16,6 +16,7 @@ import numpy as np
 from dotenv import load_dotenv
 import io
 import re
+from scipy.io.wavfile import write
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
